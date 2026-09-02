@@ -5,7 +5,22 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import { Innertube } from "youtubei.js";
+import { Innertube, Platform } from "youtubei.js";
+
+Platform.shim.eval = (data, env) => {
+  const names = Object.keys(env);
+  const values = names.map((key) => env[key]);
+  try {
+    const result = new Function(
+      ...names,
+      `"use strict"; return (${data.output});`,
+    )(...values);
+    if (result && typeof result === "object") return result;
+  } catch {
+    // o script do player às vezes não é uma expressão
+  }
+  return new Function(...names, `"use strict";\n${data.output}`)(...values);
+};
 import {
   audioDir,
   readYouTubeCookieHeader,
