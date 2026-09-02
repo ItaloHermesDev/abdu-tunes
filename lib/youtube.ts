@@ -9,6 +9,7 @@ import {
   copyFile,
   open,
   unlink,
+  stat,
 } from "node:fs/promises";
 import { createWriteStream, existsSync } from "node:fs";
 import { createGunzip } from "node:zlib";
@@ -204,15 +205,22 @@ async function seedCookiesFromEnv() {
   await saveYouTubeCookies(env.youtubeCookies);
 }
 
+async function isStaleBinary(filePath: string, maxAgeMs = 3 * 24 * 60 * 60 * 1000) {
+  try {
+    const info = await stat(filePath);
+    return Date.now() - info.mtimeMs > maxAgeMs;
+  } catch {
+    return true;
+  }
+}
+
 async function ytDlpCommonArgs() {
   await seedCookiesFromEnv();
   const args = [
     "--no-warnings",
     "--no-cache-dir",
-    "--js-runtimes",
-    `node:${process.execPath}`,
     "--extractor-args",
-    "youtube:player_client=android,tv,web",
+    "youtube:player_client=tv,android,ios",
   ];
   const cookies = cookiesPath();
   if (await fileOk(cookies)) {
@@ -307,7 +315,9 @@ export async function ensureTools() {
   let ytdlp = env.ytdlpPath || path.join(binariesDir(), ytDlpName());
   const stalePython =
     managedYtdlp && (await fileOk(ytdlp)) && (await isPythonYtDlp(ytdlp));
-  if (!(await fileOk(ytdlp)) || stalePython) {
+  const staleBuild =
+    managedYtdlp && (await fileOk(ytdlp)) && (await isStaleBinary(ytdlp));
+  if (!(await fileOk(ytdlp)) || stalePython || staleBuild) {
     await downloadBinary(ytDlpDownloadUrl(), ytdlp);
   }
 
@@ -392,6 +402,18 @@ function runCommand(
         reject(
           new Error(
             "O servidor bloqueou o yt-dlp na pasta do deploy. Atualize o app e importe de novo — os binários passam a ficar em ~/.abdu-tunes.",
+          ),
+        );
+        return;
+      }
+      if (
+        output.includes("[jsc]") ||
+        output.includes("JsChallenge") ||
+        output.includes("page needs to be reloaded")
+      ) {
+        reject(
+          new Error(
+            "O YouTube mudou a verificação. Atualize o app e importe de novo — o download agora evita o desafio JS que quebrou.",
           ),
         );
         return;
