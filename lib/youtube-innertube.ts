@@ -49,18 +49,20 @@ function playlistIdFromUrl(value: string) {
   }
 }
 
-async function createClient() {
-  const cookie = await readYouTubeCookieHeader();
-  if (!cookie) {
+async function createClient(authenticated = true) {
+  const cookie = authenticated ? await readYouTubeCookieHeader() : "";
+  if (authenticated && !cookie) {
     throw new Error(
       "Salve os cookies do YouTube na página de importar para usar este método.",
     );
   }
   return Innertube.create({
-    cookie,
+    cookie: cookie || undefined,
     retrieve_player: true,
     lang: "pt",
     location: "BR",
+    generate_session_locally: true,
+    enable_session_cache: false,
   });
 }
 
@@ -73,26 +75,39 @@ function extFromMime(mime: string) {
   return ".m4a";
 }
 
-function clientUserAgent(client: "ANDROID" | "IOS" | "TV" | "MWEB") {
+function clientUserAgent(client?: string) {
   if (client === "IOS") return Constants.CLIENTS.IOS.USER_AGENT;
   if (client === "ANDROID") return Constants.CLIENTS.ANDROID.USER_AGENT;
-  if (client === "TV") return Constants.CLIENTS.TV.USER_AGENT;
-  return "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/122.0.0.0 Mobile Safari/537.36";
+  if (client === "TV" || client === "TV_EMBEDDED") {
+    return Constants.CLIENTS.TV.USER_AGENT;
+  }
+  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 }
 
-async function fetchAudioStream(
-  yt: Awaited<ReturnType<typeof Innertube.create>>,
-  videoId: string,
-) {
+async function fetchAudioStream(videoId: string) {
   const cookie = await readYouTubeCookieHeader();
-  const clients = ["IOS", "ANDROID", "TV", "MWEB"] as const;
-  let lastStatus = 0;
+  const ytAuth = await createClient(true);
+  const ytGuest = await createClient(false);
+  const attempts: Array<{
+    session: Awaited<ReturnType<typeof createClient>>;
+    client?: "WEB" | "TV_EMBEDDED" | "WEB_EMBEDDED" | "TV" | "MWEB";
+  }> = [
+    { session: ytGuest, client: "TV_EMBEDDED" },
+    { session: ytGuest, client: "WEB_EMBEDDED" },
+    { session: ytGuest },
+    { session: ytAuth },
+    { session: ytAuth, client: "TV" },
+    { session: ytAuth, client: "MWEB" },
+  ];
 
-  for (const client of clients) {
+  let lastStatus = 0;
+  for (const attempt of attempts) {
     try {
-      const info = await yt.getBasicInfo(videoId, { client });
+      const info = attempt.client
+        ? await attempt.session.getBasicInfo(videoId, { client: attempt.client })
+        : await attempt.session.getBasicInfo(videoId);
       const format = info.chooseFormat({ type: "audio", quality: "best" });
-      const deciphered = await format.decipher(yt.session.player);
+      const deciphered = await format.decipher(attempt.session.session.player);
       const url = [deciphered, format.url].find(isHttpUrl);
       if (!url) continue;
 
@@ -104,15 +119,18 @@ async function fetchAudioStream(
         streamUrl.searchParams.set("cpn", info.cpn);
       }
 
-      const response = await yt.session.http.fetch_function(streamUrl.toString(), {
-        method: "GET",
-        headers: {
-          ...Constants.STREAM_HEADERS,
-          "user-agent": clientUserAgent(client),
-          cookie,
+      const response = await attempt.session.session.http.fetch_function(
+        streamUrl.toString(),
+        {
+          method: "GET",
+          headers: {
+            ...Constants.STREAM_HEADERS,
+            "user-agent": clientUserAgent(attempt.client),
+            ...(cookie ? { cookie } : {}),
+          },
+          redirect: "follow",
         },
-        redirect: "follow",
-      });
+      );
       if (response.ok && response.body) {
         return {
           response,
@@ -126,21 +144,11 @@ async function fetchAudioStream(
     }
   }
 
-  const info = await yt.getBasicInfo(videoId, { client: "IOS" });
-  try {
-    const stream = await info.download({ type: "audio", quality: "best" });
-    return {
-      response: new Response(stream as BodyInit),
-      info,
-      ext: ".m4a",
-    };
-  } catch {
-    throw new Error(
-      lastStatus
-        ? `Falha ao baixar o áudio (${lastStatus}).`
-        : "Não foi possível obter a URL de áudio deste vídeo.",
-    );
-  }
+  throw new Error(
+    lastStatus
+      ? `Falha ao baixar o áudio (${lastStatus}).`
+      : "O YouTube recusou o pedido do player. Exporte os cookies de novo e tente outra vez.",
+  );
 }
 
 function thumbnailOf(thumbnails: Array<{ url?: string }> | undefined) {
@@ -231,7 +239,6 @@ export async function downloadWithInnertube(
   entry: ProbeEntry,
   onProgress?: (event: DownloadProgress) => void,
 ) {
-  const yt = await createClient();
   onProgress?.({
     phase: "download",
     message: `Baixando ${entry.title}`,
@@ -239,7 +246,7 @@ export async function downloadWithInnertube(
     percent: 8,
   });
 
-  const { response, info, ext } = await fetchAudioStream(yt, entry.id);
+  const { response, info, ext } = await fetchAudioStream(entry.id);
   if (!response.ok || !response.body) {
     throw new Error(`Falha ao baixar o áudio (${response.status}).`);
   }
