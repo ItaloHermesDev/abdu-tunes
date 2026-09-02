@@ -22,5 +22,7 @@ export function getEnv() {
     binDir: read("BIN_DIR", "./bin"),
     ytdlpPath: process.env.YTDLP_PATH || "",
     ffmpegPath: process.env.FFMPEG_PATH || "",
+    youtubeCookiesFile: process.env.YOUTUBE_COOKIES_FILE || "",
+    youtubeCookies: process.env.YOUTUBE_COOKIES || "",
   };
 }

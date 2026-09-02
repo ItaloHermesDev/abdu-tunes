@@ -8,6 +8,7 @@ import {
   access,
   copyFile,
   open,
+  unlink,
 } from "node:fs/promises";
 import { createWriteStream, existsSync } from "node:fs";
 import { createGunzip } from "node:zlib";
@@ -89,6 +90,78 @@ export function coversDir() {
   return path.join(storageRoot(), "covers");
 }
 
+export function cookiesPath() {
+  const env = getEnv();
+  if (env.youtubeCookiesFile) {
+    return path.resolve(env.youtubeCookiesFile);
+  }
+  const persistent = toolsRoot();
+  if (persistent) return path.join(persistent, "youtube-cookies.txt");
+  return path.join(storageRoot(), "youtube-cookies.txt");
+}
+
+function looksLikeNetscapeCookies(text: string) {
+  const trimmed = text.trim();
+  return (
+    trimmed.length > 40 &&
+    trimmed.includes("youtube.com") &&
+    (trimmed.includes("# Netscape") ||
+      trimmed.includes("\t") ||
+      trimmed.includes(".youtube.com"))
+  );
+}
+
+export async function youtubeCookiesConfigured() {
+  return fileOk(cookiesPath());
+}
+
+export async function saveYouTubeCookies(raw: string) {
+  const text = raw.replace(/\\n/g, "\n").trim();
+  if (!looksLikeNetscapeCookies(text)) {
+    throw new Error(
+      "Cole um cookies.txt do YouTube no formato Netscape (precisa ter youtube.com).",
+    );
+  }
+  const dest = cookiesPath();
+  await mkdir(path.dirname(dest), { recursive: true });
+  await writeFile(dest, text.endsWith("\n") ? text : `${text}\n`, {
+    mode: 0o600,
+  });
+  if (process.platform !== "win32") {
+    await chmod(dest, 0o600);
+  }
+}
+
+export async function clearYouTubeCookies() {
+  const dest = cookiesPath();
+  if (await fileOk(dest)) {
+    await unlink(dest);
+  }
+}
+
+async function seedCookiesFromEnv() {
+  const env = getEnv();
+  if (!env.youtubeCookies || (await fileOk(cookiesPath()))) return;
+  await saveYouTubeCookies(env.youtubeCookies);
+}
+
+async function ytDlpCommonArgs() {
+  await seedCookiesFromEnv();
+  const args = [
+    "--no-warnings",
+    "--no-cache-dir",
+    "--js-runtimes",
+    `node:${process.execPath}`,
+    "--extractor-args",
+    "youtube:player_client=android,tv,web",
+  ];
+  const cookies = cookiesPath();
+  if (await fileOk(cookies)) {
+    args.push("--cookies", cookies);
+  }
+  return args;
+}
+
 function ytDlpName() {
   return process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 }
@@ -168,6 +241,7 @@ export async function ensureTools() {
   await mkdir(toolTmpDir(), { recursive: true });
   await mkdir(audioDir(), { recursive: true });
   await mkdir(coversDir(), { recursive: true });
+  await seedCookiesFromEnv();
 
   const env = getEnv();
   const managedYtdlp = !env.ytdlpPath;
@@ -263,6 +337,18 @@ function runCommand(
         );
         return;
       }
+      if (
+        output.includes("not a bot") ||
+        output.includes("Sign in to confirm") ||
+        output.includes("--cookies")
+      ) {
+        reject(
+          new Error(
+            "O YouTube bloqueou o IP do servidor. Exporte os cookies da sua conta (cookies.txt) e cole na página de importar.",
+          ),
+        );
+        return;
+      }
       reject(new Error(output || `yt-dlp encerrou com código ${code}`));
     });
   });
@@ -306,9 +392,8 @@ export async function probeYouTube(
 
   const { stdout } = await runCommand(ytdlp, [
     "-J",
-    "--no-warnings",
     "--skip-download",
-    "--no-cache-dir",
+    ...(await ytDlpCommonArgs()),
     playlist ? "--yes-playlist" : "--no-playlist",
     "--flat-playlist",
     url,
@@ -382,12 +467,11 @@ export async function downloadEntry(
 
   const args = [
     "--no-playlist",
-    "--no-warnings",
     "--newline",
     "-o",
     template,
     "--no-overwrites",
-    "--no-cache-dir",
+    ...(await ytDlpCommonArgs()),
   ];
 
   if (hasFfmpeg) {

@@ -1,4 +1,5 @@
 import { ImportPanel } from "@/components/import-panel";
+import { YouTubeCookiesCard } from "@/components/youtube-cookies";
 import { requireUser } from "@/lib/auth";
 import { listAlbums } from "@/lib/db";
 
@@ -19,6 +20,7 @@ export default async function ImportPage() {
         </p>
       </div>
       <ImportPanel albums={albums.map((album) => ({ id: album.id, title: album.title }))} />
+      <YouTubeCookiesCard />
     </div>
   );
 }
