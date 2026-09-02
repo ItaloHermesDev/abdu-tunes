@@ -5,7 +5,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import { Innertube, Platform } from "youtubei.js";
+import { Constants, Innertube, Platform } from "youtubei.js";
 
 Platform.shim.eval = (data, env) => {
   const names = Object.keys(env);
@@ -73,25 +73,74 @@ function extFromMime(mime: string) {
   return ".m4a";
 }
 
-async function resolveAudioUrl(yt: Awaited<ReturnType<typeof Innertube.create>>, videoId: string) {
-  const clients = ["ANDROID", "IOS", "TV", "MWEB"] as const;
-  let lastError: unknown;
+function clientUserAgent(client: "ANDROID" | "IOS" | "TV" | "MWEB") {
+  if (client === "IOS") return Constants.CLIENTS.IOS.USER_AGENT;
+  if (client === "ANDROID") return Constants.CLIENTS.ANDROID.USER_AGENT;
+  if (client === "TV") return Constants.CLIENTS.TV.USER_AGENT;
+  return "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/122.0.0.0 Mobile Safari/537.36";
+}
+
+async function fetchAudioStream(
+  yt: Awaited<ReturnType<typeof Innertube.create>>,
+  videoId: string,
+) {
+  const cookie = await readYouTubeCookieHeader();
+  const clients = ["IOS", "ANDROID", "TV", "MWEB"] as const;
+  let lastStatus = 0;
+
   for (const client of clients) {
     try {
       const info = await yt.getBasicInfo(videoId, { client });
       const format = info.chooseFormat({ type: "audio", quality: "best" });
       const deciphered = await format.decipher(yt.session.player);
       const url = [deciphered, format.url].find(isHttpUrl);
-      if (url) {
-        return { url, info, ext: extFromMime(format.mime_type || "") };
+      if (!url) continue;
+
+      const streamUrl = new URL(url);
+      if (streamUrl.searchParams.get("n")?.startsWith("enhanced_except_")) {
+        continue;
       }
-    } catch (error) {
-      lastError = error;
+      if (info.cpn && !streamUrl.searchParams.has("cpn")) {
+        streamUrl.searchParams.set("cpn", info.cpn);
+      }
+
+      const response = await yt.session.http.fetch_function(streamUrl.toString(), {
+        method: "GET",
+        headers: {
+          ...Constants.STREAM_HEADERS,
+          "user-agent": clientUserAgent(client),
+          cookie,
+        },
+        redirect: "follow",
+      });
+      if (response.ok && response.body) {
+        return {
+          response,
+          info,
+          ext: extFromMime(format.mime_type || ""),
+        };
+      }
+      lastStatus = response.status;
+    } catch {
+      // tenta o próximo cliente
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Não foi possível obter a URL de áudio deste vídeo.");
+
+  const info = await yt.getBasicInfo(videoId, { client: "IOS" });
+  try {
+    const stream = await info.download({ type: "audio", quality: "best" });
+    return {
+      response: new Response(stream as BodyInit),
+      info,
+      ext: ".m4a",
+    };
+  } catch {
+    throw new Error(
+      lastStatus
+        ? `Falha ao baixar o áudio (${lastStatus}).`
+        : "Não foi possível obter a URL de áudio deste vídeo.",
+    );
+  }
 }
 
 function thumbnailOf(thumbnails: Array<{ url?: string }> | undefined) {
@@ -190,15 +239,7 @@ export async function downloadWithInnertube(
     percent: 8,
   });
 
-  const { url, info, ext } = await resolveAudioUrl(yt, entry.id);
-  const response = await fetch(url, {
-    headers: {
-      Accept: "*/*",
-      "User-Agent":
-        "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
-    },
-    redirect: "follow",
-  });
+  const { response, info, ext } = await fetchAudioStream(yt, entry.id);
   if (!response.ok || !response.body) {
     throw new Error(`Falha ao baixar o áudio (${response.status}).`);
   }
