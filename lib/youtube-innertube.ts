@@ -43,10 +43,40 @@ async function createClient() {
   }
   return Innertube.create({
     cookie,
-    retrieve_player: false,
+    retrieve_player: true,
     lang: "pt",
     location: "BR",
   });
+}
+
+function isHttpUrl(value: string | undefined) {
+  return Boolean(value && /^https?:\/\//i.test(value));
+}
+
+function extFromMime(mime: string) {
+  if (mime.includes("webm") || mime.includes("opus")) return ".webm";
+  return ".m4a";
+}
+
+async function resolveAudioUrl(yt: Awaited<ReturnType<typeof Innertube.create>>, videoId: string) {
+  const clients = ["ANDROID", "IOS", "TV", "MWEB"] as const;
+  let lastError: unknown;
+  for (const client of clients) {
+    try {
+      const info = await yt.getBasicInfo(videoId, { client });
+      const format = info.chooseFormat({ type: "audio", quality: "best" });
+      const deciphered = await format.decipher(yt.session.player);
+      const url = [deciphered, format.url].find(isHttpUrl);
+      if (url) {
+        return { url, info, ext: extFromMime(format.mime_type || "") };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Não foi possível obter a URL de áudio deste vídeo.");
 }
 
 function thumbnailOf(thumbnails: Array<{ url?: string }> | undefined) {
@@ -145,17 +175,23 @@ export async function downloadWithInnertube(
     percent: 8,
   });
 
-  const info = await yt.getBasicInfo(entry.id);
-  const stream = await info.download({
-    type: "audio",
-    quality: "best",
-    client: "ANDROID",
+  const { url, info, ext } = await resolveAudioUrl(yt, entry.id);
+  const response = await fetch(url, {
+    headers: {
+      Accept: "*/*",
+      "User-Agent":
+        "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
+    },
+    redirect: "follow",
   });
+  if (!response.ok || !response.body) {
+    throw new Error(`Falha ao baixar o áudio (${response.status}).`);
+  }
 
   await mkdir(audioDir(), { recursive: true });
-  const dest = path.join(audioDir(), `${entry.id}.m4a`);
+  const dest = path.join(audioDir(), `${entry.id}${ext}`);
   await pipeline(
-    Readable.fromWeb(stream as never),
+    Readable.fromWeb(response.body as never),
     createWriteStream(dest),
   );
 
