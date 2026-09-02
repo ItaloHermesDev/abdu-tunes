@@ -41,12 +41,44 @@ export type DownloadProgress = {
   title?: string;
 };
 
+function isEphemeralHost() {
+  return /hbuilds/i.test(process.cwd());
+}
+
+function toolsRoot() {
+  if (process.platform !== "win32" && process.env.HOME && isEphemeralHost()) {
+    return path.join(process.env.HOME, ".abdu-tunes");
+  }
+  return null;
+}
+
 function binariesDir() {
+  const persistent = toolsRoot();
+  if (persistent) return path.join(persistent, "bin");
   return path.resolve(process.cwd(), getEnv().binDir);
+}
+
+function toolTmpDir() {
+  const persistent = toolsRoot();
+  if (persistent) return path.join(persistent, "tmp");
+  return path.join(storageRoot(), "tmp");
 }
 
 function storageRoot() {
   return path.resolve(process.cwd(), getEnv().storageDir);
+}
+
+function toolEnv() {
+  const tmp = toolTmpDir();
+  const env = { ...process.env };
+  delete env.LD_LIBRARY_PATH;
+  delete env.LD_PRELOAD;
+  env.TMPDIR = tmp;
+  env.TEMP = tmp;
+  env.TMP = tmp;
+  env.HOME = process.env.HOME || tmp;
+  env.XDG_CACHE_HOME = path.join(tmp, "cache");
+  return env;
 }
 
 export function audioDir() {
@@ -133,6 +165,7 @@ async function maybeFfmpegStatic() {
 
 export async function ensureTools() {
   await mkdir(binariesDir(), { recursive: true });
+  await mkdir(toolTmpDir(), { recursive: true });
   await mkdir(audioDir(), { recursive: true });
   await mkdir(coversDir(), { recursive: true });
 
@@ -145,10 +178,13 @@ export async function ensureTools() {
     await downloadBinary(ytDlpDownloadUrl(), ytdlp);
   }
 
-  let ffmpeg =
-    env.ffmpegPath ||
-    (await maybeFfmpegStatic()) ||
-    path.join(binariesDir(), ffmpegName());
+  let ffmpeg = env.ffmpegPath;
+  if (!ffmpeg && !isEphemeralHost()) {
+    ffmpeg = (await maybeFfmpegStatic()) || "";
+  }
+  if (!ffmpeg) {
+    ffmpeg = path.join(binariesDir(), ffmpegName());
+  }
 
   if (!(await fileOk(ffmpeg))) {
     const ffmpegUrl =
@@ -178,6 +214,7 @@ function runCommand(
     const child = spawn(binary, args, {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
+      env: toolEnv(),
     });
     let stdout = "";
     let stderr = "";
@@ -214,6 +251,14 @@ function runCommand(
         reject(
           new Error(
             "O servidor não tem Python. O import agora baixa o yt-dlp standalone. Tente importar de novo.",
+          ),
+        );
+        return;
+      }
+      if (output.includes("libz") || output.includes("shared libraries")) {
+        reject(
+          new Error(
+            "O servidor bloqueou o yt-dlp na pasta do deploy. Atualize o app e importe de novo — os binários passam a ficar em ~/.abdu-tunes.",
           ),
         );
         return;
@@ -263,6 +308,7 @@ export async function probeYouTube(
     "-J",
     "--no-warnings",
     "--skip-download",
+    "--no-cache-dir",
     playlist ? "--yes-playlist" : "--no-playlist",
     "--flat-playlist",
     url,
@@ -341,6 +387,7 @@ export async function downloadEntry(
     "-o",
     template,
     "--no-overwrites",
+    "--no-cache-dir",
   ];
 
   if (hasFfmpeg) {
