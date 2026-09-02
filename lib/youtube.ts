@@ -5,6 +5,7 @@ import {
   chmod,
   mkdir,
   writeFile,
+  readFile,
   access,
   copyFile,
   open,
@@ -75,6 +76,21 @@ function toolEnv() {
   const env = { ...process.env };
   delete env.LD_LIBRARY_PATH;
   delete env.LD_PRELOAD;
+  delete env.NODE;
+  delete env.NODE_PATH;
+  const nodeDir = path.dirname(process.execPath).toLowerCase();
+  const pathKey = process.platform === "win32" ? "Path" : "PATH";
+  const parts = (env[pathKey] || env.PATH || "").split(path.delimiter);
+  env[pathKey] = parts
+    .filter((part) => {
+      const lower = part.toLowerCase();
+      return (
+        part &&
+        !lower.includes("nodejs") &&
+        path.resolve(part).toLowerCase() !== nodeDir
+      );
+    })
+    .join(path.delimiter);
   env.TMPDIR = tmp;
   env.TEMP = tmp;
   env.TMP = tmp;
@@ -199,6 +215,22 @@ export async function clearYouTubeCookies() {
   }
 }
 
+export async function readYouTubeCookieHeader() {
+  const dest = cookiesPath();
+  if (!(await fileOk(dest))) return "";
+  const text = await readFile(dest, "utf8");
+  const pairs: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line || line.startsWith("#")) continue;
+    const parts = line.split("\t");
+    if (parts.length < 7) continue;
+    const name = parts[5];
+    const value = parts[6];
+    if (name && value) pairs.push(`${name}=${value}`);
+  }
+  return pairs.join("; ");
+}
+
 async function seedCookiesFromEnv() {
   const env = getEnv();
   if (!env.youtubeCookies || (await fileOk(cookiesPath()))) return;
@@ -220,7 +252,7 @@ async function ytDlpCommonArgs() {
     "--no-warnings",
     "--no-cache-dir",
     "--extractor-args",
-    "youtube:player_client=tv,android,ios",
+    "youtube:player_client=tv,android,ios;player_skip=js,webpage,configs",
   ];
   const cookies = cookiesPath();
   if (await fileOk(cookies)) {
@@ -465,6 +497,27 @@ export async function probeYouTube(
   playlist: boolean,
   onProgress?: (event: DownloadProgress) => void,
 ): Promise<ProbeResult> {
+  try {
+    return await probeWithYtDlp(url, playlist, onProgress);
+  } catch (error) {
+    onProgress?.({
+      phase: "probe",
+      message: "O yt-dlp falhou. Tentando método alternativo...",
+    });
+    try {
+      const { probeWithInnertube } = await import("@/lib/youtube-innertube");
+      return await probeWithInnertube(url, playlist, onProgress);
+    } catch (altError) {
+      throw altError instanceof Error ? altError : error;
+    }
+  }
+}
+
+async function probeWithYtDlp(
+  url: string,
+  playlist: boolean,
+  onProgress?: (event: DownloadProgress) => void,
+): Promise<ProbeResult> {
   const { ytdlp } = await ensureTools();
   onProgress?.({
     phase: "probe",
@@ -578,17 +631,51 @@ export async function downloadEntry(
     percent: 0,
   });
 
-  await runCommand(ytdlp, args, (line) => {
-    const match = line.match(/(\d+(?:\.\d+)?)%/);
-    if (match) {
-      onProgress?.({
-        phase: "download",
-        message: `Baixando ${entry.title}`,
-        title: entry.title,
-        percent: Number(match[1]),
-      });
+  try {
+    await runCommand(ytdlp, args, (line) => {
+      const match = line.match(/(\d+(?:\.\d+)?)%/);
+      if (match) {
+        onProgress?.({
+          phase: "download",
+          message: `Baixando ${entry.title}`,
+          title: entry.title,
+          percent: Number(match[1]),
+        });
+      }
+    });
+  } catch (error) {
+    onProgress?.({
+      phase: "download",
+      message: `Método alternativo: ${entry.title}`,
+      title: entry.title,
+      percent: 5,
+    });
+    const { downloadWithInnertube } = await import("@/lib/youtube-innertube");
+    const alt = await downloadWithInnertube(entry, onProgress);
+    let filePath = alt.filePath;
+    if (hasFfmpeg && path.extname(filePath) !== ".mp3") {
+      const mp3 = path.join(audioDir(), `${entry.id}.mp3`);
+      await runCommand(ffmpeg, [
+        "-y",
+        "-i",
+        filePath,
+        "-vn",
+        "-codec:a",
+        "libmp3lame",
+        "-q:a",
+        "2",
+        mp3,
+      ]);
+      filePath = mp3;
     }
-  });
+    const thumbnailPath = await saveThumbnail(entry.id, entry.thumbnail);
+    return {
+      filePath,
+      thumbnailPath,
+      mimeType: mimeFromExt(filePath),
+      duration: alt.duration || entry.duration,
+    };
+  }
 
   const candidates = [".mp3", ".m4a", ".webm", ".opus", ".ogg", ".wav"].map(
     (ext) => path.join(audioDir(), `${entry.id}${ext}`),
