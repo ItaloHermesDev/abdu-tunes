@@ -111,20 +111,79 @@ function looksLikeNetscapeCookies(text: string) {
   );
 }
 
+function jsonCookiesToNetscape(raw: string) {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const list = Array.isArray(parsed)
+      ? parsed
+      : parsed &&
+          typeof parsed === "object" &&
+          Array.isArray((parsed as { cookies?: unknown }).cookies)
+        ? (parsed as { cookies: unknown[] }).cookies
+        : null;
+    if (!list?.length) return null;
+
+    const lines = ["# Netscape HTTP Cookie File"];
+    for (const item of list) {
+      if (!item || typeof item !== "object") continue;
+      const cookie = item as {
+        domain?: string;
+        path?: string;
+        secure?: boolean;
+        expirationDate?: number;
+        expires?: number;
+        session?: boolean;
+        name?: string;
+        value?: string;
+      };
+      if (!cookie.name || cookie.value == null || !cookie.domain) continue;
+      if (!cookie.domain.includes("youtube.com") && !cookie.domain.includes("google.com")) {
+        continue;
+      }
+      const expiry = cookie.session
+        ? 0
+        : Math.trunc(cookie.expirationDate || cookie.expires || 0);
+      const domain = cookie.domain.startsWith(".")
+        ? cookie.domain
+        : cookie.domain;
+      const includeSub = domain.startsWith(".") ? "TRUE" : "FALSE";
+      lines.push(
+        [
+          domain,
+          includeSub,
+          cookie.path || "/",
+          cookie.secure ? "TRUE" : "FALSE",
+          String(expiry),
+          cookie.name,
+          cookie.value,
+        ].join("\t"),
+      );
+    }
+    if (lines.length < 2) return null;
+    return `${lines.join("\n")}\n`;
+  } catch {
+    return null;
+  }
+}
+
 export async function youtubeCookiesConfigured() {
   return fileOk(cookiesPath());
 }
 
 export async function saveYouTubeCookies(raw: string) {
   const text = raw.replace(/\\n/g, "\n").trim();
-  if (!looksLikeNetscapeCookies(text)) {
+  const converted = text.startsWith("[") || text.startsWith("{")
+    ? jsonCookiesToNetscape(text)
+    : null;
+  const netscape = converted || (looksLikeNetscapeCookies(text) ? text : null);
+  if (!netscape) {
     throw new Error(
-      "Cole um cookies.txt do YouTube no formato Netscape (precisa ter youtube.com).",
+      "Cole o export da extensão (Netscape ou JSON). Precisa ter cookies do youtube.com.",
     );
   }
   const dest = cookiesPath();
   await mkdir(path.dirname(dest), { recursive: true });
-  await writeFile(dest, text.endsWith("\n") ? text : `${text}\n`, {
+  await writeFile(dest, netscape.endsWith("\n") ? netscape : `${netscape}\n`, {
     mode: 0o600,
   });
   if (process.platform !== "win32") {

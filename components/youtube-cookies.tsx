@@ -62,19 +62,21 @@ export function YouTubeCookiesCard() {
         <div className="min-w-0">
           <h2 className="font-black">Cookies do YouTube</h2>
           <p className="mt-1 text-sm text-muted">
-            O servidor da Hostinger é bloqueado como bot. Exporte o{" "}
-            <code className="font-bold">cookies.txt</code> da sua conta logada
-            no YouTube e cole abaixo.
+            Nessa tela de cookies, não use New/Import. Exporte e cole o
+            conteúdo aqui (Netscape ou JSON).
           </p>
         </div>
       </div>
 
       <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-muted">
-        <li>No computador, abra o YouTube e entre na sua conta.</li>
+        <li>Fique em youtube.com já logado.</li>
         <li>
-          Use uma extensão tipo “Get cookies.txt LOCALLY” e exporte o arquivo.
+          Na extensão, procure <strong>Export</strong> / exportar — não o
+          “New / Import”.
         </li>
-        <li>Abra o arquivo, copie tudo e cole aqui.</li>
+        <li>
+          Se pedir formato, escolha Netscape ou JSON. Copie tudo e cole abaixo.
+        </li>
       </ol>
 
       <p className="mt-3 text-sm font-bold">
@@ -89,7 +91,7 @@ export function YouTubeCookiesCard() {
         onChange={(event) => setCookies(event.target.value)}
         rows={6}
         spellCheck={false}
-        placeholder="# Netscape HTTP Cookie File"
+        placeholder="Cole o export aqui (Netscape ou JSON)"
         className="mt-3 w-full rounded-2xl border border-line bg-background px-4 py-3 font-mono text-xs"
       />
 
