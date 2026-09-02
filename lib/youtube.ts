@@ -7,6 +7,7 @@ import {
   writeFile,
   access,
   copyFile,
+  open,
 } from "node:fs/promises";
 import { createWriteStream, existsSync } from "node:fs";
 import { createGunzip } from "node:zlib";
@@ -60,6 +61,34 @@ function ytDlpName() {
   return process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 }
 
+function ytDlpDownloadUrl() {
+  if (process.platform === "win32") {
+    return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+  }
+  if (process.platform === "darwin") {
+    return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
+  }
+  if (process.arch === "arm64") {
+    return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64";
+  }
+  if (process.arch === "arm") {
+    return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l";
+  }
+  return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
+}
+
+async function isPythonYtDlp(filePath: string) {
+  try {
+    const handle = await open(filePath, "r");
+    const buffer = Buffer.alloc(80);
+    const { bytesRead } = await handle.read(buffer, 0, 80, 0);
+    await handle.close();
+    return buffer.subarray(0, bytesRead).toString("utf8").includes("python");
+  } catch {
+    return false;
+  }
+}
+
 function ffmpegName() {
   return process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
 }
@@ -108,15 +137,12 @@ export async function ensureTools() {
   await mkdir(coversDir(), { recursive: true });
 
   const env = getEnv();
+  const managedYtdlp = !env.ytdlpPath;
   let ytdlp = env.ytdlpPath || path.join(binariesDir(), ytDlpName());
-  if (!(await fileOk(ytdlp))) {
-    const url =
-      process.platform === "win32"
-        ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-        : process.platform === "darwin"
-          ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-          : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-    await downloadBinary(url, ytdlp);
+  const stalePython =
+    managedYtdlp && (await fileOk(ytdlp)) && (await isPythonYtDlp(ytdlp));
+  if (!(await fileOk(ytdlp)) || stalePython) {
+    await downloadBinary(ytDlpDownloadUrl(), ytdlp);
   }
 
   let ffmpeg =
@@ -166,17 +192,33 @@ function runCommand(
       stderr += text;
       text.split(/\r?\n/).filter(Boolean).forEach((line) => onOutput?.(line));
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("python")) {
+        reject(
+          new Error(
+            "yt-dlp precisa do binário standalone. Remova BIN_DIR/yt-dlp e importe de novo.",
+          ),
+        );
+        return;
+      }
+      reject(error);
+    });
     child.on("close", (code) => {
       if (code === 0) {
         resolve({ stdout, stderr });
         return;
       }
-      reject(
-        new Error(
-          stderr.trim() || stdout.trim() || `yt-dlp encerrou com código ${code}`,
-        ),
-      );
+      const output = stderr.trim() || stdout.trim();
+      if (output.includes("python3") || output.includes("python")) {
+        reject(
+          new Error(
+            "O servidor não tem Python. O import agora baixa o yt-dlp standalone. Tente importar de novo.",
+          ),
+        );
+        return;
+      }
+      reject(new Error(output || `yt-dlp encerrou com código ${code}`));
     });
   });
 }
