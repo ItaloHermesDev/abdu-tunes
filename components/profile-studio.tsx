@@ -83,7 +83,7 @@ export function ProfileStudio({ user }: { user: PublicUser }) {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-4xl font-black">Perfil</h1>
+        <h1 className="text-3xl font-black md:text-4xl">Perfil</h1>
         <p className="text-muted">
           Cada perfil tem avatar, álbuns e faixas próprios.
         </p>

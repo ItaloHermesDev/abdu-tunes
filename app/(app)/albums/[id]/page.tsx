@@ -23,14 +23,16 @@ export default async function AlbumDetailPage({
     <div className="mx-auto max-w-5xl space-y-8">
       <div className="flex flex-col gap-6 md:flex-row">
         <div
-          className="h-56 w-56 overflow-hidden rounded-[2rem] bg-abdu-gradient bg-cover bg-center glow-abdu"
+          className="mx-auto h-40 w-40 overflow-hidden rounded-[2rem] bg-abdu-gradient bg-cover bg-center glow-abdu md:mx-0 md:h-56 md:w-56"
           style={{
-            backgroundImage: `url(${album.coverUrl || tracks[0]?.coverUrl || "/assets/brand/capa-album-1.png"})`,
+            backgroundImage: album.coverUrl || tracks[0]?.coverUrl
+              ? `url(${album.coverUrl || tracks[0]?.coverUrl})`
+              : undefined,
           }}
         />
-        <div className="flex flex-col justify-end">
+        <div className="flex flex-col justify-end text-center md:text-left">
           <p className="text-xs font-black tracking-[0.3em] text-muted">ÁLBUM</p>
-          <h1 className="text-5xl font-black">{album.title}</h1>
+          <h1 className="text-3xl font-black md:text-5xl">{album.title}</h1>
           <p className="mt-2 text-muted">
             {album.description || `${album.trackCount} faixas na sua biblioteca`}
           </p>

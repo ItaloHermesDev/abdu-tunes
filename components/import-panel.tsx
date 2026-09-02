@@ -83,7 +83,7 @@ export function ImportPanel({ albums }: { albums: AlbumOption[] }) {
 
   return (
     <form onSubmit={start} className="space-y-6">
-      <div className="rounded-[2rem] border border-line glass-panel p-6 md:p-8">
+      <div className="rounded-[1.6rem] border border-line glass-panel p-4 md:rounded-[2rem] md:p-8">
         <label className="block text-sm font-extrabold">
           Link do YouTube ou YouTube Music
           <input
@@ -193,7 +193,7 @@ export function ImportPanel({ albums }: { albums: AlbumOption[] }) {
         <button
           type="submit"
           disabled={running}
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-abdu-gradient px-6 py-3 font-black text-white glow-abdu disabled:opacity-60"
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-abdu-gradient px-6 py-3 font-black text-white glow-abdu disabled:opacity-60 md:w-auto"
         >
           <Download size={18} />
           {running ? "Importando..." : "Baixar MP3"}

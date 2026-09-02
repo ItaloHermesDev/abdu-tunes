@@ -15,10 +15,7 @@ export default async function AlbumsPage() {
         : (await listTracks(user.profileId, { albumId: album.id, limit: 1 }))[0];
       return {
         ...album,
-        image:
-          album.coverUrl ||
-          fallback?.coverUrl ||
-          "/assets/brand/capa-album-1.png",
+        image: album.coverUrl || fallback?.coverUrl || null,
       };
     }),
   );
@@ -27,7 +24,7 @@ export default async function AlbumsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black">Álbuns</h1>
+          <h1 className="text-3xl font-black md:text-4xl">Álbuns</h1>
           <p className="text-muted">Playlists e discos da sua biblioteca.</p>
         </div>
         <CreateAlbumForm />

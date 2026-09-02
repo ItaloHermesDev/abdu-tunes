@@ -54,7 +54,7 @@ export function TrackRow({
 
   return (
     <div
-      className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3 py-2 hover:bg-surface-2 ${
+      className={`grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-2xl px-2 py-2 hover:bg-surface-2 sm:gap-3 sm:px-3 ${
         active ? "bg-surface-2" : ""
       }`}
     >

@@ -15,7 +15,7 @@ export default async function FavoritesPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-4xl font-black">Favoritos</h1>
+        <h1 className="text-3xl font-black md:text-4xl">Favoritos</h1>
         <p className="text-muted">Tudo o que você marcou com coração.</p>
       </div>
       {tracks.length ? (

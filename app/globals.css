@@ -120,6 +120,19 @@ body {
   }
 }
 
+.mobile-drawer {
+  animation: slide-in-left 0.22s ease-out;
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 input[type="range"].abdu-range {
   appearance: none;
   height: 4px;
@@ -130,6 +143,12 @@ input[type="range"].abdu-range {
     #ff4d6d var(--progress, 0%),
     rgba(127, 127, 127, 0.28) var(--progress, 0%)
   );
+}
+
+input[type="range"].abdu-range.h-1 {
+  height: 4px;
+  margin: 0;
+  padding: 0;
 }
 
 input[type="range"].abdu-range::-webkit-slider-thumb {

@@ -15,7 +15,7 @@ export default async function TracksPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-4xl font-black">Faixas soltas</h1>
+        <h1 className="text-3xl font-black md:text-4xl">Faixas soltas</h1>
         <p className="text-muted">Músicas sem álbum, prontas para tocar ou organizar.</p>
       </div>
       {tracks.length ? (

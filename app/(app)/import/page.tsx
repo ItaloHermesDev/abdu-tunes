@@ -12,7 +12,7 @@ export default async function ImportPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <p className="text-xs font-black tracking-[0.3em] text-muted">YOUTUBE → MP3</p>
-        <h1 className="text-4xl font-black">Importar músicas</h1>
+        <h1 className="text-3xl font-black md:text-4xl">Importar músicas</h1>
         <p className="mt-2 max-w-2xl text-muted">
           Cole o link de um vídeo ou de uma playlist. Baixe uma faixa só ou a
           lista inteira, direto para um álbum ou como faixa solta.

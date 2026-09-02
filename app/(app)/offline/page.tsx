@@ -15,7 +15,7 @@ export default function OfflinePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-4xl font-black">Offline</h1>
+        <h1 className="text-3xl font-black md:text-4xl">Offline</h1>
         <p className="text-muted">
           Faixas salvas neste aparelho. Marque o ícone de download em qualquer
           música para ouvir sem internet.

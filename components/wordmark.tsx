@@ -5,10 +5,12 @@ export function Wordmark({
   className,
   size = "md",
   withMark = false,
+  priority = false,
 }: {
   className?: string;
   size?: "sm" | "md" | "lg";
   withMark?: boolean;
+  priority?: boolean;
 }) {
   const text =
     size === "lg" ? "text-4xl md:text-5xl" : size === "sm" ? "text-lg" : "text-2xl";
@@ -22,6 +24,7 @@ export function Wordmark({
           width={size === "lg" ? 56 : size === "sm" ? 28 : 40}
           height={size === "lg" ? 56 : size === "sm" ? 28 : 40}
           className="h-auto w-auto rounded-full"
+          priority={priority}
         />
       ) : null}
       <span className={cn("font-black tracking-tight", text)}>

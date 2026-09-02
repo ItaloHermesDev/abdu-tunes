@@ -1,10 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FEATURED_ALBUMS, FEATURED_ARTISTS } from "@/lib/featured";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/wordmark";
-import { AlbumCard } from "@/components/album-card";
-import { SoundWave } from "@/components/sound-wave";
 import { Mandala } from "@/components/mandala";
 
 const APPLICATIONS = [
@@ -106,47 +103,6 @@ export default function IdentityPage() {
               <Image src="/assets/brand/post-social-wide.png" alt="Post wide" width={1200} height={900} />
               <figcaption className="p-4 font-bold">9. Post paisagem</figcaption>
             </figure>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-3xl font-black">5. Capas de álbum</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-            {FEATURED_ALBUMS.map((album) => (
-              <AlbumCard key={album.title} title={album.title} subtitle={album.artist} image={album.image} />
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-3xl font-black">4. Cards de artistas</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            {FEATURED_ARTISTS.map((artist) => (
-              <article key={artist.name} className="overflow-hidden rounded-[1.8rem] border border-line bg-surface">
-                <div className="relative h-64">
-                  <Image src={artist.image} alt={artist.name} fill className="object-cover" sizes="33vw" />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-extrabold">{artist.name}</h3>
-                  <p className="text-sm text-muted">{artist.role}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-line bg-surface p-6">
-          <h2 className="text-3xl font-black">2. Player de música</h2>
-          <div className="mt-6 flex flex-col items-center gap-4 rounded-[1.8rem] bg-ink p-6 text-white">
-            <div className="h-40 w-40 overflow-hidden rounded-[1.6rem]">
-              <Image src="/assets/brand/capa-album-1.png" alt="" width={320} height={320} />
-            </div>
-            <p className="text-xl font-black">Raga Neon</p>
-            <p className="text-sm text-white/60">Abdu Collective</p>
-            <SoundWave />
-            <div className="h-1 w-full max-w-md overflow-hidden rounded-full bg-white/15">
-              <div className="h-full w-2/3 bg-abdu-gradient" />
-            </div>
           </div>
         </section>
 

@@ -43,8 +43,77 @@ export function PlayerBar() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line glass-panel px-4 py-3 md:px-6">
-      <div className="mx-auto grid max-w-7xl items-center gap-4 md:grid-cols-[1.2fr_2fr_1fr]">
+    <div className="border-t border-line glass-panel">
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={progress}
+        disabled={!current}
+        onChange={(event) => seek(Number(event.target.value))}
+        className="abdu-range block h-1 w-full md:hidden"
+        style={{ ["--progress" as string]: `${percent}%` }}
+        aria-label="Progresso da faixa"
+      />
+
+      <div className="flex items-center gap-3 px-3 py-2 md:hidden">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-abdu-gradient">
+          {current?.coverUrl ? (
+            <Image
+              src={current.coverUrl}
+              alt=""
+              fill
+              className="object-cover"
+              unoptimized
+              sizes="48px"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-white">
+              ♪
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-extrabold">
+            {current?.title ?? "Selecione uma faixa"}
+          </p>
+          <p className="truncate text-xs text-muted">
+            {current?.artist ?? "Abdu Tunes"}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={!current}
+          onClick={favorite}
+          className="rounded-full p-2 text-muted disabled:opacity-40"
+          aria-label="Favoritar"
+        >
+          <Heart
+            className={current?.isFavorite ? "fill-coral text-coral" : ""}
+            size={18}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={!current}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-abdu-gradient text-white glow-abdu disabled:opacity-40"
+          aria-label={playing ? "Pausar" : "Tocar"}
+        >
+          {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={next}
+          className="rounded-full p-2 text-muted"
+          aria-label="Próxima"
+        >
+          <SkipForward size={18} />
+        </button>
+      </div>
+
+      <div className="mx-auto hidden max-w-7xl items-center gap-4 px-6 py-3 md:grid md:grid-cols-[1.2fr_2fr_1fr]">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-abdu-gradient">
             {current?.coverUrl ? (
@@ -57,7 +126,9 @@ export function PlayerBar() {
                 sizes="56px"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-white">♪</div>
+              <div className="flex h-full items-center justify-center text-white">
+                ♪
+              </div>
             )}
           </div>
           <div className="min-w-0">
@@ -72,7 +143,7 @@ export function PlayerBar() {
             type="button"
             disabled={!current}
             onClick={favorite}
-            className="hidden rounded-full p-2 text-muted hover:text-coral sm:block"
+            className="rounded-full p-2 text-muted hover:text-coral"
             aria-label="Favoritar"
           >
             <Heart
@@ -109,7 +180,7 @@ export function PlayerBar() {
             >
               <SkipForward size={18} />
             </button>
-            <SoundWave active={playing} className="hidden sm:flex" />
+            <SoundWave active={playing} />
           </div>
           <div className="flex w-full items-center gap-3 text-xs text-muted">
             <span className="w-10 text-right">{formatDuration(progress)}</span>
@@ -124,11 +195,13 @@ export function PlayerBar() {
               className="abdu-range w-full"
               style={{ ["--progress" as string]: `${percent}%` }}
             />
-            <span className="w-10">{formatDuration(duration || current?.duration || 0)}</span>
+            <span className="w-10">
+              {formatDuration(duration || current?.duration || 0)}
+            </span>
           </div>
         </div>
 
-        <div className="hidden items-center justify-end gap-3 md:flex">
+        <div className="flex items-center justify-end gap-3">
           <Volume2 size={16} className="text-muted" />
           <input
             type="range"

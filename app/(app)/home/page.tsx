@@ -1,9 +1,7 @@
-import { AlbumCard } from "@/components/album-card";
 import { TrackRow } from "@/components/track-row";
 import { EmptyState } from "@/components/library-extras";
 import { requireUser } from "@/lib/auth";
 import { libraryStats, listAlbums, listTracks } from "@/lib/db";
-import { FEATURED_ALBUMS, FEATURED_ARTISTS } from "@/lib/featured";
 
 export const metadata = { title: "Início" };
 
@@ -22,7 +20,7 @@ export default async function HomePage() {
         <p className="text-xs font-black tracking-[0.3em] text-muted">
           MUSIC. INDIA. EVERYWHERE.
         </p>
-        <h1 className="mt-2 text-4xl font-black">Olá, {user.profileName.split(" ")[0]}</h1>
+        <h1 className="mt-2 text-3xl font-black md:text-4xl">Olá, {user.profileName.split(" ")[0]}</h1>
         <p className="text-muted">Biblioteca do perfil {user.profileName} — só o que é seu.</p>
       </header>
 
@@ -73,41 +71,6 @@ export default async function HomePage() {
           </div>
         </section>
       ) : null}
-
-      <section>
-        <h2 className="mb-4 text-2xl font-black">Para você</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          {FEATURED_ALBUMS.map((album) => (
-            <AlbumCard
-              key={album.title}
-              title={album.title}
-              subtitle={album.artist}
-              image={album.image}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-2xl font-black">Cards de artistas</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {FEATURED_ARTISTS.map((artist) => (
-            <article
-              key={artist.name}
-              className="overflow-hidden rounded-[1.8rem] border border-line bg-surface"
-            >
-              <div
-                className="h-48 bg-cover bg-center"
-                style={{ backgroundImage: `url(${artist.image})` }}
-              />
-              <div className="p-4">
-                <h3 className="font-extrabold">{artist.name}</h3>
-                <p className="text-sm text-muted">{artist.role}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
